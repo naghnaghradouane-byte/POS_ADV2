@@ -5,7 +5,7 @@ import { User, onAuthStateChanged } from 'firebase/auth';
 import { auth, loginWithGoogle, loginWithEmail, registerWithEmail, logoutUser } from './lib/firebase';
 import { uploadAllToFirebase, downloadAllFromFirebase } from './lib/firebaseSync';
 import { motion, AnimatePresence } from 'motion/react';
-import { LogIn, Cloud, ShieldAlert, Eye, EyeOff, Loader2, Mail, Lock, User as UserIcon, X } from 'lucide-react';
+import { LogIn, Cloud, ShieldAlert, Eye, EyeOff, Loader2, Mail, Lock, User as UserIcon, X, Sun, Moon } from 'lucide-react';
 
 // import view modules
 import Sidebar from './components/Sidebar';
@@ -29,6 +29,25 @@ export default function App() {
   const [currentView, setCurrentView] = React.useState<string>('dashboard');
   const [syncing, setSyncing] = React.useState<boolean>(false);
   const [user, setUser] = React.useState<User | null>(null);
+
+  // Load and apply persistent light/dark mode preference
+  const [theme, setTheme] = React.useState<'light' | 'dark'>(() => {
+    const saved = localStorage.getItem('POS_THEME');
+    if (saved === 'dark' || saved === 'light') return saved;
+    if (typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+      return 'dark';
+    }
+    return 'light';
+  });
+
+  React.useEffect(() => {
+    if (theme === 'dark') {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+    localStorage.setItem('POS_THEME', theme);
+  }, [theme]);
 
   // Native Cloud Auth Modal states (for phone compatibility where popups fail)
   const [showLoginModal, setShowLoginModal] = React.useState<boolean>(false);
@@ -661,7 +680,7 @@ export default function App() {
   return (
     <div
       dir="rtl"
-      className="min-h-screen bg-slate-50 text-slate-800 flex flex-col lg:flex-row font-sans overflow-x-hidden antialiased"
+      className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-100 flex flex-col lg:flex-row font-sans overflow-x-hidden antialiased transition-colors duration-200"
     >
       {/* Sidebar for navigations */}
       <Sidebar
@@ -679,18 +698,18 @@ export default function App() {
       {/* Main viewport area layout */}
       <main className="flex-1 overflow-y-auto h-screen p-4 sm:p-6 lg:p-8 space-y-6">
         {/* Breadcrumb row header */}
-        <div className="flex justify-between items-center bg-white px-5 py-3 rounded-2xl border border-slate-200/60 shadow-sm shrink-0">
+        <div className="flex justify-between items-center bg-white dark:bg-slate-900 px-5 py-3 rounded-2xl border border-slate-200/60 dark:border-slate-800/80 shadow-sm dark:shadow-none shrink-0 transition-colors duration-200">
           <div className="space-y-0.5">
             {user ? (
-              <span className="text-[10px] bg-emerald-100/80 text-emerald-805 px-2.5 py-0.5 rounded-full font-bold">
+              <span className="text-[10px] bg-emerald-100/80 dark:bg-emerald-950/45 text-emerald-805 dark:text-emerald-350 px-2.5 py-0.5 rounded-full font-bold">
                 نشط اتصال سحابي • Firebase Cloud Active
               </span>
             ) : (
-              <span className="text-[10px] bg-amber-50 text-amber-700 px-2.5 py-0.5 rounded-full font-bold">
+              <span className="text-[10px] bg-amber-50 dark:bg-amber-950/45 text-amber-700 dark:text-amber-300 px-2.5 py-0.5 rounded-full font-bold">
                 نشط دون اتصال • SQLite Offline Mode
               </span>
             )}
-            <h2 className="font-extrabold text-slate-905 tracking-wide text-sm sm:text-base">
+            <h2 className="font-extrabold text-slate-905 dark:text-white tracking-wide text-sm sm:text-base">
               {currentView === 'dashboard' ? 'اللوحة الإحصائية والربحية' :
                currentView === 'pos' ? 'نقطة البيع والمبيعات المباشرة' :
                currentView === 'products' ? 'كتالوج ومخزون المنتجات' :
@@ -706,11 +725,33 @@ export default function App() {
             </h2>
           </div>
 
-          <div className="hidden sm:flex items-center gap-3 font-medium text-xs text-slate-500">
-            <span>القسم:</span>
-            <span className="font-bold text-indigo-650 bg-indigo-50 px-3 py-1 rounded-lg">
-              {currentView.toUpperCase()}
-            </span>
+          <div className="flex items-center gap-4">
+            {/* Theme Toggle Button */}
+            <button
+              onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+              className="p-2 sm:px-3.5 sm:py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-850 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 hover:text-slate-950 dark:hover:text-white transition-all shadow-xs cursor-pointer flex items-center justify-center gap-2"
+              title={theme === 'dark' ? 'تفعيل الوضع المضيء' : 'تفعيل الوضع الداكن'}
+              id="theme-toggle-btn"
+            >
+              {theme === 'dark' ? (
+                <>
+                  <Sun size={15} className="text-amber-400" />
+                  <span className="hidden sm:inline font-bold text-xs">الوضع المضيء</span>
+                </>
+              ) : (
+                <>
+                  <Moon size={15} className="text-slate-650" />
+                  <span className="hidden sm:inline font-bold text-xs">الوضع الداكن</span>
+                </>
+              )}
+            </button>
+
+            <div className="hidden sm:flex items-center gap-3 font-medium text-xs text-slate-500 dark:text-slate-400">
+              <span>القسم:</span>
+              <span className="font-bold text-indigo-650 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-950/40 px-3 py-1 rounded-lg">
+                {currentView.toUpperCase()}
+              </span>
+            </div>
           </div>
         </div>
 
