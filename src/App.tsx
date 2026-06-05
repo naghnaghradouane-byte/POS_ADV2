@@ -1,5 +1,5 @@
 import React from 'react';
-import { ERPState, Product, Category, Customer, Supplier, Order, Purchase, Expense, InventoryMovement, CompanySettings } from './types';
+import { ERPState, Product, Category, Customer, Supplier, Order, Purchase, Expense, InventoryMovement, CompanySettings, SystemUser } from './types';
 import { initialERPState } from './data/initialData';
 import { User, onAuthStateChanged } from 'firebase/auth';
 import { auth, loginWithGoogle, logoutUser } from './lib/firebase';
@@ -19,6 +19,7 @@ import SalesView from './components/SalesView';
 import ExpensesView from './components/ExpensesView';
 import ReportsView from './components/ReportsView';
 import SettingsView from './components/SettingsView';
+import UsersView from './components/UsersView';
 
 const STORAGE_KEY = 'SMART_POS_ERP_STATE_V1';
 
@@ -52,6 +53,50 @@ export default function App() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   }, [state]);
 
+  const users = state.users || [];
+  const activeUserId = state.activeUserId || 'usr_admin';
+  const activeUser = users.find(u => u.id === activeUserId) || users[0] || {
+    id: 'usr_admin',
+    name: 'عبدالرحمن العتيبي (المالك)',
+    username: 'admin',
+    phone: '0555555555',
+    pinCode: '1234',
+    role: 'admin',
+    permissions: {
+      dashboard: true,
+      pos: true,
+      products: true,
+      categories: true,
+      customers: true,
+      suppliers: true,
+      inventory: true,
+      purchases: true,
+      sales: true,
+      expenses: true,
+      reports: true,
+      settings: true,
+      editInvoices: true,
+      returnItems: true,
+    }
+  };
+
+  // Redirect if currentView has no permission
+  React.useEffect(() => {
+    if (activeUser && activeUser.permissions) {
+      const viewKey = currentView as keyof typeof activeUser.permissions;
+      if (activeUser.permissions[viewKey] === false) {
+        // Find first allowed view, fallback to 'pos'
+        const allowedViews = (Object.keys(activeUser.permissions) as (keyof typeof activeUser.permissions)[])
+          .filter(k => activeUser.permissions[k] === true);
+        if (allowedViews.length > 0) {
+          setCurrentView(allowedViews[0]);
+        } else {
+          setCurrentView('pos');
+        }
+      }
+    }
+  }, [state.activeUserId, currentView, activeUser]);
+
   // Google Sign-In with automatic sync integration
   const handleLogin = async () => {
     try {
@@ -70,6 +115,8 @@ export default function App() {
             expenses: cloudData.expenses || [],
             movements: cloudData.movements || [],
             settings: cloudData.settings || state.settings,
+            users: cloudData.users || state.users || [],
+            activeUserId: cloudData.activeUserId || state.activeUserId || 'usr_admin',
           });
         } else {
           // Upload local data to provision brand-new account storage
@@ -109,6 +156,8 @@ export default function App() {
           expenses: cloudData.expenses || [],
           movements: cloudData.movements || [],
           settings: cloudData.settings || state.settings,
+          users: cloudData.users || state.users || [],
+          activeUserId: cloudData.activeUserId || state.activeUserId || 'usr_admin',
         };
         setState(syncedState);
         await uploadAllToFirebase(syncedState);
@@ -256,6 +305,13 @@ export default function App() {
     }));
   };
 
+  const handleUpdateOrder = (updatedOrder: Order) => {
+    setState((prev) => ({
+      ...prev,
+      orders: prev.orders.map((o) => (o.id === updatedOrder.id ? updatedOrder : o)),
+    }));
+  };
+
   // Procurement purchases
   const handleAddPurchase = (purchase: Purchase) => {
     setState((prev) => ({
@@ -302,6 +358,35 @@ export default function App() {
     setState((prev) => ({
       ...prev,
       settings: updated,
+    }));
+  };
+
+  // --- Staff & Permissions Handlers ---
+  const handleAddUser = (newUser: SystemUser) => {
+    setState((prev) => ({
+      ...prev,
+      users: [...(prev.users || []), newUser],
+    }));
+  };
+
+  const handleUpdateUser = (updatedUser: SystemUser) => {
+    setState((prev) => ({
+      ...prev,
+      users: (prev.users || []).map((u) => (u.id === updatedUser.id ? updatedUser : u)),
+    }));
+  };
+
+  const handleDeleteUser = (userId: string) => {
+    setState((prev) => ({
+      ...prev,
+      users: (prev.users || []).filter((u) => u.id !== userId),
+    }));
+  };
+
+  const handleSwitchUser = (userId: string) => {
+    setState((prev) => ({
+      ...prev,
+      activeUserId: userId,
     }));
   };
 
@@ -409,9 +494,11 @@ export default function App() {
             orders={state.orders}
             products={state.products}
             onRefundOrder={handleRefundOrder}
+            onUpdateOrder={handleUpdateOrder}
             onRestockProduct={handleAdjustProductStock}
             onUpdateCustomerBalance={handleUpdateCustomerBalance}
             currencySymbol={sym}
+            activeUser={activeUser}
           />
         );
 
@@ -449,6 +536,18 @@ export default function App() {
           />
         );
 
+      case 'users':
+        return (
+          <UsersView
+            users={state.users || []}
+            activeUserId={activeUserId}
+            onAddUser={handleAddUser}
+            onUpdateUser={handleUpdateUser}
+            onDeleteUser={handleDeleteUser}
+            onSwitchUser={handleSwitchUser}
+          />
+        );
+
       default:
         return (
           <div className="py-20 text-center text-slate-400 font-bold">
@@ -481,6 +580,7 @@ export default function App() {
         user={user}
         onLogin={handleLogin}
         onLogout={handleLogout}
+        activeUser={activeUser}
       />
 
       {/* Main viewport area layout */}

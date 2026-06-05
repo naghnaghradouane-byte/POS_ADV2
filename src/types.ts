@@ -75,7 +75,7 @@ export interface Order {
   amountPaid: number;
   change: number;
   date: string; // ISO string
-  status: 'completed' | 'refunded' | 'returned';
+  status: 'completed' | 'refunded' | 'returned' | 'partially_returned';
 }
 
 export interface Purchase {
@@ -134,4 +134,33 @@ export interface ERPState {
   expenses: Expense[];
   movements: InventoryMovement[];
   settings: CompanySettings;
+  users?: SystemUser[];
+  activeUserId?: string;
+}
+
+export interface UserPermissions {
+  dashboard: boolean;
+  pos: boolean;
+  products: boolean;
+  categories: boolean;
+  customers: boolean;
+  suppliers: boolean;
+  inventory: boolean;
+  purchases: boolean;
+  sales: boolean;
+  expenses: boolean;
+  reports: boolean;
+  settings: boolean;
+  editInvoices: boolean;
+  returnItems: boolean;
+}
+
+export interface SystemUser {
+  id: string;
+  name: string;
+  username: string;
+  phone: string;
+  pinCode: string;
+  role: 'admin' | 'manager' | 'cashier';
+  permissions: UserPermissions;
 }

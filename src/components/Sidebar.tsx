@@ -29,6 +29,7 @@ interface SidebarProps {
   user: User | null;
   onLogin: () => void;
   onLogout: () => void;
+  activeUser?: any;
 }
 
 export default function Sidebar({
@@ -40,10 +41,11 @@ export default function Sidebar({
   user,
   onLogin,
   onLogout,
+  activeUser,
 }: SidebarProps) {
   const [isOpen, setIsOpen] = React.useState(false);
 
-  const menuItems = [
+  const baseMenuItems = [
     { id: 'dashboard', label: 'لوحة التحكم', icon: LayoutDashboard, color: 'text-emerald-500 bg-emerald-500/10' },
     { id: 'pos', label: 'شاشة نقطة البيع (POS)', icon: ShoppingCart, color: 'text-rose-500 bg-rose-500/10' },
     { id: 'products', label: 'إدارة المنتجات', icon: Package, color: 'text-indigo-500 bg-indigo-500/10' },
@@ -55,8 +57,16 @@ export default function Sidebar({
     { id: 'sales', label: 'سجل المبيعات والفواتير', icon: Receipt, color: 'text-sky-500 bg-sky-500/10' },
     { id: 'expenses', label: 'المصاريف النقدية', icon: Coins, color: 'text-orange-500 bg-orange-500/10' },
     { id: 'reports', label: 'التقارير والتحليلات', icon: BarChart3, color: 'text-violet-500 bg-violet-500/10' },
+    { id: 'users', label: 'الموظفون والصلاحيات', icon: Users, color: 'text-fuchsia-500 bg-fuchsia-500/10' },
     { id: 'settings', label: 'إعدادات النظام', icon: Settings, color: 'text-slate-500 bg-slate-500/10' },
   ];
+
+  const menuItems = baseMenuItems.filter(item => {
+    if (!activeUser || !activeUser.permissions) return true;
+    const key = item.id;
+    if (key === 'users' && activeUser.role !== 'admin') return false;
+    return activeUser.permissions[key] !== false;
+  });
 
   return (
     <>
@@ -139,6 +149,23 @@ export default function Sidebar({
             {syncing ? 'جاري المزامنة...' : 'مزامنة الآن'}
           </button>
         </div>
+
+        {/* Active System User Session */}
+        {activeUser && (
+          <div className="mx-4 mt-3 p-3 rounded-2xl bg-slate-800/80 border border-slate-750 flex items-center justify-between shrink-0">
+            <div className="text-right">
+              <span className="text-[9px] text-slate-500 font-bold block leading-none">الكاشير النشط حالياً:</span>
+              <span className="font-extrabold text-white text-[11px] mt-1 block truncate max-w-[140px]">{activeUser.name}</span>
+            </div>
+            <span className={`text-[9px] font-black px-2 py-0.5 rounded-md ${
+              activeUser.role === 'admin' ? 'bg-rose-500/25 text-rose-400' :
+              activeUser.role === 'manager' ? 'bg-indigo-500/25 text-indigo-300' : 'bg-emerald-500/25 text-emerald-300'
+            }`}>
+              {activeUser.role === 'admin' ? 'المالك' :
+               activeUser.role === 'manager' ? 'المشرف' : 'الكاشير'}
+            </span>
+          </div>
+        )}
 
         {/* Scrollable Navigation Menu */}
         <nav className="flex-1 overflow-y-auto px-4 py-4 space-y-1 scrollbar-thin scrollbar-thumb-slate-800">

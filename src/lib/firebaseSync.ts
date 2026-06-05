@@ -81,6 +81,18 @@ export async function uploadAllToFirebase(state: ERPState): Promise<void> {
     const sRef = doc(db, 'settings', 'company');
     batch.set(sRef, state.settings);
 
+    // 10. System Users
+    if (state.users) {
+      state.users.forEach((u) => {
+        if (u.id) {
+          const uRef = doc(db, 'users_list', u.id);
+          batch.set(uRef, u);
+        }
+      });
+    }
+    const aRef = doc(db, 'settings', 'active_session');
+    batch.set(aRef, { activeUserId: state.activeUserId || 'usr_admin' });
+
     // Commit dynamic data
     await batch.commit();
   } catch (error) {
@@ -131,6 +143,18 @@ export async function downloadAllFromFirebase(): Promise<Partial<ERPState>> {
     const companyDoc = setSnap.docs.find((d) => d.id === 'company');
     if (companyDoc) {
       result.settings = companyDoc.data() as CompanySettings;
+    }
+    const activeDoc = setSnap.docs.find((d) => d.id === 'active_session');
+    if (activeDoc) {
+      result.activeUserId = activeDoc.data()?.activeUserId;
+    }
+
+    // Users
+    try {
+      const userSnap = await getDocs(collection(db, 'users_list'));
+      result.users = userSnap.docs.map((d) => d.data() as any);
+    } catch (err) {
+      console.warn("Could not download users list (might not have permissions or be created yet).", err);
     }
   } catch (error) {
     handleFirestoreError(error, OperationType.LIST, 'bulk-download');
