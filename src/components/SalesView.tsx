@@ -1,6 +1,6 @@
 import React from 'react';
 import { Order, Product, SystemUser } from '../types';
-import { Search, Receipt, ArrowLeftRight, Check, Printer, X, ShoppingBag, Edit3, Save, Info, Lock } from 'lucide-react';
+import { Search, Receipt, ArrowLeftRight, Check, Printer, X, ShoppingBag, Edit3, Save, Info, Lock, Download, FileSpreadsheet } from 'lucide-react';
 
 interface SalesViewProps {
   orders: Order[];
@@ -24,6 +24,59 @@ export default function SalesView({
   activeUser,
 }: SalesViewProps) {
   const [searchQuery, setSearchQuery] = React.useState('');
+
+  const handleExportSalesCSV = () => {
+    // CSV Header row
+    const headers = [
+      'رقم الفاتورة (Invoice Number)',
+      'العميل (Customer)',
+      'طريقة الدفع (Payment Method)',
+      'التاريخ والوقت (Date & Time)',
+      'عدد السلع (Total Items)',
+      'المجموع الفرعي (Subtotal)',
+      'الخصومات (Discount)',
+      'قيمة الضريبة (VAT 15%)',
+      'الإجمالي النهائي (Total)',
+      'حالة الفاتورة (Status)'
+    ];
+
+    // Data rows
+    const rows = orders.map((order) => {
+      const isRefunded = order.status === 'refunded';
+      const isPartiallyReturned = order.status === 'returned' || order.status === 'partially_returned';
+      const statusText = isRefunded ? 'مرتجع بالكامل' : isPartiallyReturned ? 'مرتجع جزئي' : 'مكتملة ومرحلة';
+      const paymentMethodText = 
+         order.paymentMethod === 'cash' ? 'نقدي' :
+         order.paymentMethod === 'card' ? 'بطاقة مادا' :
+         order.paymentMethod === 'transfer' ? 'تحويل بنكي' : 'آجل (دين)';
+      const totalItems = order.items.reduce((s, i) => s + i.quantity, 0);
+
+      return [
+        `"${order.invoiceNumber}"`,
+        `"${order.customerName.replace(/"/g, '""')}"`,
+        `"${paymentMethodText}"`,
+        `"${new Date(order.date).toLocaleString('ar-EG')}"`,
+        totalItems,
+        order.subtotal,
+        order.discountAmount,
+        order.taxAmount,
+        order.total,
+        `"${statusText}"`
+      ];
+    });
+
+    // Build content with BOM (Byte Order Mark) for proper Arabic display in MS Excel
+    const csvContent = '\uFEFF' + [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
+    
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `sales_export_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
   
   // printable receipt overlay state
   const [viewedOrder, setViewedOrder] = React.useState<Order | null>(null);
@@ -172,15 +225,26 @@ export default function SalesView({
     <div className="space-y-5">
       {/* Search Header widget */}
       <div className="bg-white p-4 rounded-2xl border border-slate-205 shadow-xs flex flex-col sm:flex-row gap-4 items-center justify-between">
-        <div className="relative w-full sm:max-w-md">
-          <Search size={16} className="absolute right-3 top-3 text-slate-400" />
-          <input
-            type="text"
-            placeholder="ابحث برقم الفاتورة أو اسم الزبون..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pr-9 pl-3 py-2 rounded-xl border border-slate-200 text-xs focus:ring-1 focus:ring-emerald-500 focus:outline-hidden"
-          />
+        <div className="flex flex-col sm:flex-row gap-3 w-full sm:max-w-xl flex-1">
+          <div className="relative flex-1">
+            <Search size={16} className="absolute right-3 top-3 text-slate-400" />
+            <input
+              type="text"
+              placeholder="ابحث برقم الفاتورة أو اسم الزبون..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pr-9 pl-3 py-2 rounded-xl border border-slate-200 text-xs focus:ring-1 focus:ring-emerald-500 focus:outline-hidden"
+            />
+          </div>
+
+          <button
+            onClick={handleExportSalesCSV}
+            className="py-2 px-4 bg-indigo-50 text-indigo-750 border border-indigo-200 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 hover:bg-indigo-100 transition shadow-xs cursor-pointer shrink-0"
+            title="تصدير كشف المبيعات إلى ملف Excel بصيغة CSV"
+          >
+            <Download size={14} />
+            <span>تصدير المبيعات لـ Excel</span>
+          </button>
         </div>
 
         <span className="text-[10px] bg-indigo-50 font-black text-indigo-700 border border-indigo-150 px-3 py-1.5 rounded-xl block font-mono">
@@ -486,20 +550,20 @@ export default function SalesView({
 
       {/* Invoice Thermal view Modal dialog */}
       {viewedOrder && (
-        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4 backdrop-blur-xs animate-fade-in">
-          <div className="bg-white rounded-3xl w-full max-w-sm overflow-hidden shadow-2xl border border-slate-100 text-slate-800 flex flex-col max-h-[85vh]">
-            <div className="p-4 bg-slate-900 text-white flex items-center justify-between shrink-0">
+        <div className="fixed inset-0 z-50 bg-black/65 flex items-center justify-center p-2.5 sm:p-4 backdrop-blur-xs animate-fade-in">
+          <div className="bg-white rounded-3xl w-full max-w-[325px] sm:max-w-sm overflow-hidden shadow-2xl border border-slate-100 text-slate-800 flex flex-col max-h-[90vh]">
+            <div className="p-3 bg-slate-900 text-white flex items-center justify-between shrink-0">
               <span className="font-bold text-xs">عرض الإيصال: {viewedOrder.invoiceNumber}</span>
               <button
                 onClick={() => setViewedOrder(null)}
-                className="text-slate-400 hover:text-white p-1 rounded-full bg-slate-800"
+                className="text-slate-400 hover:text-white p-1 rounded-full bg-slate-800 w-6 h-6 flex items-center justify-center text-xs"
               >
                 ✕
               </button>
             </div>
 
             {/* Simulated Printed Thermal Paper layout */}
-            <div className="flex-1 overflow-y-auto p-6 font-mono text-[11px] text-right bg-amber-50/10 space-y-4">
+            <div className="flex-1 overflow-y-auto p-4 sm:p-6 font-mono text-[10px] sm:text-[11px] text-right bg-amber-50/10 space-y-3 sm:space-y-4">
               <div className="text-center space-y-1 pb-4 border-b border-dashed border-slate-300">
                 <p className="text-base font-black tracking-tight text-slate-900">سوبرماركت البرق التجاري</p>
                 <p className="text-slate-500 text-[10px]">الرياض - شارع التخصصي</p>

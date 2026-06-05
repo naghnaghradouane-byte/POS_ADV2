@@ -9,7 +9,10 @@ import {
   ArrowUpDown,
   Filter,
   Check,
-  AlertCircle
+  AlertCircle,
+  Download,
+  Upload,
+  FileSpreadsheet
 } from 'lucide-react';
 
 interface ProductsViewProps {
@@ -31,6 +34,131 @@ export default function ProductsView({
 }: ProductsViewProps) {
   const [searchQuery, setSearchQuery] = React.useState('');
   const [selectedCategory, setSelectedCategory] = React.useState('all');
+
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+  const handleExportCSV = () => {
+    // CSV Header row
+    const headers = [
+      'اسم المنتج (Name)',
+      'باركود المنتج (Barcode)',
+      'الرمز الفرعي (SKU)',
+      'معرف القسم (Category ID)',
+      'الشركة المصنعة (Brand)',
+      'سعر الشراء (Cost Price)',
+      'سعر البيع (Selling Price)',
+      'سعر الجملة (Wholesale Price)',
+      'الكمية المتوفرة (Stock)',
+      'الحد الأدنى للتنبيه (Minimum Alert)'
+    ];
+
+    // Data rows
+    const rows = products.map((prod) => [
+      `"${prod.name.replace(/"/g, '""')}"`,
+      `"${prod.barcode.replace(/"/g, '""')}"`,
+      `"${prod.sku.replace(/"/g, '""')}"`,
+      `"${prod.category.replace(/"/g, '""')}"`,
+      `"${(prod.brand || '').replace(/"/g, '""')}"`,
+      prod.costPrice,
+      prod.sellingPrice,
+      prod.wholesalePrice || prod.sellingPrice,
+      prod.stockQuantity,
+      prod.minStockAlert
+    ]);
+
+    // Build content with BOM (Byte Order Mark) for proper Arabic display in MS Excel
+    const csvContent = '\uFEFF' + [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
+    
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `products_export_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handleImportCSV = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const text = event.target?.result as string;
+        const lines = text.split(/\r?\n/);
+        if (lines.length <= 1) {
+          alert('الملف فارغ أو لا يحتوي على بنية بيانات صحيحة.');
+          return;
+        }
+
+        let importedCount = 0;
+        lines.slice(1).forEach((line) => {
+          if (!line.trim()) return;
+          
+          // Split safely by comma while respecting quotes
+          const cols: string[] = [];
+          let current = '';
+          let inQuotes = false;
+          
+          for (let i = 0; i < line.length; i++) {
+            const char = line[i];
+            if (char === '"') {
+              inQuotes = !inQuotes;
+            } else if (char === ',' && !inQuotes) {
+              cols.push(current.trim());
+              current = '';
+            } else {
+              current += char;
+            }
+          }
+          cols.push(current.trim());
+
+          if (cols.length >= 2 && cols[0]) {
+            const prodName = cols[0].replace(/^"|"$/g, '').replace(/""/g, '"').trim();
+            const prodBarcode = (cols[1] || '').replace(/^"|"$/g, '').trim() || ('62811' + Math.floor(100000 + Math.random() * 900000));
+            const prodSku = (cols[2] || '').replace(/^"|"$/g, '').trim() || ('PROD-SKU-' + Math.floor(100000 + Math.random() * 900000));
+            const prodCategory = (cols[3] || '').replace(/^"|"$/g, '').trim() || (categories[0]?.id || 'cat_general');
+            const prodBrand = (cols[4] || '').replace(/^"|"$/g, '').trim() || '';
+            const prodCost = parseFloat(cols[5]) || 0;
+            const prodSelling = parseFloat(cols[6]) || 0;
+            const prodWholesale = parseFloat(cols[7]) || prodSelling;
+            const prodStock = parseInt(cols[8]) || 0;
+            const prodMinAlert = parseInt(cols[9]) || 5;
+
+            // Generate unique random product ID
+            const newProduct: Product = {
+              id: 'prod_' + Math.random().toString(36).substr(2, 9),
+              name: prodName,
+              barcode: prodBarcode,
+              sku: prodSku,
+              category: prodCategory,
+              brand: prodBrand,
+              description: '',
+              costPrice: prodCost,
+              sellingPrice: prodSelling,
+              wholesalePrice: prodWholesale,
+              stockQuantity: prodStock,
+              minStockAlert: prodMinAlert
+            };
+
+            onAddProduct(newProduct);
+            importedCount++;
+          }
+        });
+
+        alert(`✅ تم استيراد عدد (${importedCount}) من المنتجات بنجاح إلى قاعدة البيانات الخاصة بك!`);
+      } catch (err) {
+        alert('❌ حدث خطأ أثناء معالجة الملف. يرجى محاولة استخدام ملف CSV معتمد.');
+        console.error(err);
+      }
+    };
+    reader.readAsText(file, 'utf-8');
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
 
   // Form Modal state
   const [showModal, setShowModal] = React.useState(false);
@@ -172,13 +300,42 @@ export default function ProductsView({
           </select>
         </div>
 
-        <button
-          onClick={openAddModal}
-          className="w-full md:w-auto py-2.5 px-5 bg-slate-900 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 hover:bg-slate-800 transition shadow-sm cursor-pointer"
-        >
-          <Plus size={16} />
-          <span>إضافة منتج جديد</span>
-        </button>
+        <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
+          {/* Hidden File Input for CSV Import */}
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleImportCSV}
+            accept=".csv"
+            className="hidden"
+          />
+          
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            className="py-2.5 px-3.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 hover:bg-emerald-100 transition shadow-xs cursor-pointer"
+            title="استيراد منتجات من ملف Excel بصيغة CSV"
+          >
+            <Upload size={14} />
+            <span>استيراد Excel</span>
+          </button>
+
+          <button
+            onClick={handleExportCSV}
+            className="py-2.5 px-3.5 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 hover:bg-indigo-100 transition shadow-xs cursor-pointer"
+            title="تصدير قائمة المنتجات إلى ملف Excel بصيغة CSV"
+          >
+            <Download size={14} />
+            <span>تصدير Excel</span>
+          </button>
+
+          <button
+            onClick={openAddModal}
+            className="py-2.5 px-5 bg-slate-900 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 hover:bg-slate-800 transition shadow-sm cursor-pointer"
+          >
+            <Plus size={16} />
+            <span>إضافة منتج جديد</span>
+          </button>
+        </div>
       </div>
 
       {/* Main Table Card */}

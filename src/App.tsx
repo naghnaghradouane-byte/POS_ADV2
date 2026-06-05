@@ -2,8 +2,10 @@ import React from 'react';
 import { ERPState, Product, Category, Customer, Supplier, Order, Purchase, Expense, InventoryMovement, CompanySettings, SystemUser } from './types';
 import { initialERPState } from './data/initialData';
 import { User, onAuthStateChanged } from 'firebase/auth';
-import { auth, loginWithGoogle, logoutUser } from './lib/firebase';
+import { auth, loginWithGoogle, loginWithEmail, registerWithEmail, logoutUser } from './lib/firebase';
 import { uploadAllToFirebase, downloadAllFromFirebase } from './lib/firebaseSync';
+import { motion, AnimatePresence } from 'motion/react';
+import { LogIn, Cloud, ShieldAlert, Eye, EyeOff, Loader2, Mail, Lock, User as UserIcon, X } from 'lucide-react';
 
 // import view modules
 import Sidebar from './components/Sidebar';
@@ -27,6 +29,16 @@ export default function App() {
   const [currentView, setCurrentView] = React.useState<string>('dashboard');
   const [syncing, setSyncing] = React.useState<boolean>(false);
   const [user, setUser] = React.useState<User | null>(null);
+
+  // Native Cloud Auth Modal states (for phone compatibility where popups fail)
+  const [showLoginModal, setShowLoginModal] = React.useState<boolean>(false);
+  const [authEmail, setAuthEmail] = React.useState<string>('');
+  const [authPass, setAuthPass] = React.useState<string>('');
+  const [authName, setAuthName] = React.useState<string>('');
+  const [isRegisterMode, setIsRegisterMode] = React.useState<boolean>(false);
+  const [authError, setAuthError] = React.useState<string | null>(null);
+  const [showPassword, setShowPassword] = React.useState<boolean>(false);
+  const [authWorking, setAuthWorking] = React.useState<boolean>(false);
   const [state, setState] = React.useState<ERPState>(() => {
     // Attempt local storage loading for durable offline preservation
     const saved = localStorage.getItem(STORAGE_KEY);
@@ -97,36 +109,115 @@ export default function App() {
     }
   }, [state.activeUserId, currentView, activeUser]);
 
-  // Google Sign-In with automatic sync integration
-  const handleLogin = async () => {
+  // Synchronise system data package on login success
+  const syncOnLoginSuccess = async (usr: any) => {
     try {
       setSyncing(true);
-      const usr = await loginWithGoogle();
-      if (usr) {
-        const cloudData = await downloadAllFromFirebase();
-        if (cloudData.products && cloudData.products.length > 0) {
-          setState({
-            products: cloudData.products || [],
-            categories: cloudData.categories || [],
-            customers: cloudData.customers || [],
-            suppliers: cloudData.suppliers || [],
-            orders: cloudData.orders || [],
-            purchases: cloudData.purchases || [],
-            expenses: cloudData.expenses || [],
-            movements: cloudData.movements || [],
-            settings: cloudData.settings || state.settings,
-            users: cloudData.users || state.users || [],
-            activeUserId: cloudData.activeUserId || state.activeUserId || 'usr_admin',
-          });
-        } else {
-          // Upload local data to provision brand-new account storage
-          await uploadAllToFirebase(state);
-        }
+      const cloudData = await downloadAllFromFirebase();
+      if (cloudData.products && cloudData.products.length > 0) {
+        setState({
+          products: cloudData.products || [],
+          categories: cloudData.categories || [],
+          customers: cloudData.customers || [],
+          suppliers: cloudData.suppliers || [],
+          orders: cloudData.orders || [],
+          purchases: cloudData.purchases || [],
+          expenses: cloudData.expenses || [],
+          movements: cloudData.movements || [],
+          settings: cloudData.settings || state.settings,
+          users: cloudData.users || state.users || [],
+          activeUserId: cloudData.activeUserId || state.activeUserId || 'usr_admin',
+        });
+      } else {
+        // Upload local data to provision brand-new account storage
+        await uploadAllToFirebase(state);
       }
     } catch (e) {
-      console.error('Sign-in failed: ', e);
+      console.error('Data Sync failed: ', e);
     } finally {
       setSyncing(false);
+    }
+  };
+
+  // Google Sign-In with automatic sync integration
+  const handleLogin = async () => {
+    setAuthError(null);
+    setIsRegisterMode(false);
+    setAuthEmail('');
+    setAuthPass('');
+    setAuthName('');
+    setShowLoginModal(true);
+  };
+
+  const handleGoogleSignInInline = async () => {
+    try {
+      setAuthWorking(true);
+      setAuthError(null);
+      const usr = await loginWithGoogle();
+      if (usr) {
+        await syncOnLoginSuccess(usr);
+        setShowLoginModal(false);
+      }
+    } catch (e: any) {
+      setAuthError(e.message || 'فشل تسجيل الدخول عبر حساب جوجل.');
+    } finally {
+      setAuthWorking(false);
+    }
+  };
+
+  const handleEmailSignInInline = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!authEmail || !authPass) {
+      setAuthError('يرجى كتابة البريد الإلكتروني وكلمة المرور.');
+      return;
+    }
+    try {
+      setAuthWorking(true);
+      setAuthError(null);
+      const usr = await loginWithEmail(authEmail, authPass);
+      if (usr) {
+        await syncOnLoginSuccess(usr);
+        setShowLoginModal(false);
+      }
+    } catch (e: any) {
+      let friendlyError = e.message;
+      if (e.code === 'auth/wrong-password' || friendlyError.includes('password') || friendlyError.includes('credential')) {
+        friendlyError = 'كلمة المرور أو البريد الإلكتروني غير صحيح، يرجى إعادة التحقق.';
+      } else if (e.code === 'auth/user-not-found' || friendlyError.includes('user-not-found')) {
+        friendlyError = 'هذا البريد الإلكتروني غير مرتبط بأي حساب نشط.';
+      }
+      setAuthError(friendlyError);
+    } finally {
+      setAuthWorking(false);
+    }
+  };
+
+  const handleEmailRegisterInline = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!authEmail || !authPass || !authName) {
+      setAuthError('يرجى تعبئة كافة الحقول المطلوبة لإنشاء حساب سحابي.');
+      return;
+    }
+    if (authPass.length < 6) {
+      setAuthError('يجب أن لا تقل قوة كلمة المرور عن 6 خانات أو حروف.');
+      return;
+    }
+    try {
+      setAuthWorking(true);
+      setAuthError(null);
+      const usr = await registerWithEmail(authEmail, authPass, authName);
+      if (usr) {
+        await syncOnLoginSuccess(usr);
+        setShowLoginModal(false);
+      }
+    } catch (e: any) {
+      let friendlyError = e.message;
+      if (e.code === 'auth/email-already-in-use' || friendlyError.includes('email-already-in-use')) {
+        friendlyError = 'البريد الإلكتروني مسجل بالفعل لصاحب منشأة أخرى.';
+      }
+      setAuthError(friendlyError);
+    } finally {
+      setAuthWorking(false);
     }
   };
 
@@ -626,6 +717,173 @@ export default function App() {
           {renderViewContent()}
         </div>
       </main>
+
+      {/* --- Responsive Cloud Login Modal overlay --- */}
+      <AnimatePresence>
+        {showLoginModal && (
+          <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-xs flex items-center justify-center p-4">
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-white rounded-3xl w-full max-w-[340px] sm:max-w-md overflow-hidden shadow-2xl border border-slate-100 text-slate-800 flex flex-col text-right animate-scale-up"
+            >
+              {/* Header */}
+              <div className="p-4 bg-slate-900 text-white flex items-center justify-between shrink-0">
+                <div className="flex items-center gap-2">
+                  <Cloud size={16} className="text-emerald-400 animate-pulse" />
+                  <span className="font-bold text-xs sm:text-sm">بوابة المزامنة السحابية • Sync Portal</span>
+                </div>
+                <button
+                  onClick={() => setShowLoginModal(false)}
+                  className="text-slate-400 hover:text-white p-1 rounded-full bg-slate-800 w-6 h-6 flex items-center justify-center text-xs cursor-pointer"
+                >
+                  ✕
+                </button>
+              </div>
+
+              {/* Modal Body */}
+              <div className="p-5 sm:p-6 space-y-4 overflow-y-auto max-h-[80vh]">
+                {authError && (
+                  <div className="p-3 bg-red-50 border border-red-150 rounded-xl text-xs text-red-700 flex items-start gap-2 leading-relaxed">
+                    <ShieldAlert size={16} className="shrink-0 text-red-500 mt-0.5" />
+                    <span>{authError}</span>
+                  </div>
+                )}
+
+                {/* Login/Register Form */}
+                <form onSubmit={isRegisterMode ? handleEmailRegisterInline : handleEmailSignInInline} className="space-y-4">
+                  {isRegisterMode && (
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-bold text-slate-500 block">اسم المتجر أو المالك:</label>
+                      <div className="relative">
+                        <UserIcon size={14} className="absolute right-3.5 top-3.5 text-slate-400" />
+                        <input
+                          type="text"
+                          value={authName}
+                          onChange={(e) => setAuthName(e.target.value)}
+                          className="w-full pr-10 pl-3 py-2.5 rounded-xl border border-slate-200 text-xs focus:ring-2 focus:ring-emerald-500/10 focus:outline-none transition leading-relaxed text-right font-bold"
+                          placeholder="مثال: سوبرماركت البرق"
+                          required
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-bold text-slate-500 block">البريد الإلكتروني للقرص السحابي:</label>
+                    <div className="relative">
+                      <Mail size={14} className="absolute right-3.5 top-3.5 text-slate-400" />
+                      <input
+                        type="email"
+                        value={authEmail}
+                        onChange={(e) => setAuthEmail(e.target.value)}
+                        className="w-full pr-10 pl-3 py-2.5 rounded-xl border border-slate-200 text-xs focus:ring-2 focus:ring-emerald-500/10 focus:outline-none transition leading-relaxed text-left font-mono"
+                        placeholder="name@owner.com"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-bold text-slate-500 block">كلمة المرور السحابية:</label>
+                    <div className="relative">
+                      <Lock size={14} className="absolute right-3.5 top-3.5 text-slate-400" />
+                      <input
+                        type={showPassword ? 'text' : 'password'}
+                        value={authPass}
+                        onChange={(e) => setAuthPass(e.target.value)}
+                        className="w-full pr-10 pl-10 py-2.5 rounded-xl border border-slate-200 text-xs focus:ring-2 focus:ring-emerald-500/10 focus:outline-none transition leading-relaxed text-left font-mono"
+                        placeholder="••••••••"
+                        required
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute left-3 top-2.5 text-slate-400 hover:text-slate-600 p-1 rounded-md"
+                      >
+                        {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+                      </button>
+                    </div>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={authWorking}
+                    className="w-full py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl text-xs shadow-md transition flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer mt-2"
+                  >
+                    {authWorking ? (
+                      <Loader2 size={14} className="animate-spin text-white" />
+                    ) : (
+                      <LogIn size={14} />
+                    )}
+                    <span>
+                      {isRegisterMode 
+                        ? 'إنشاء حساب جديد وتفعيل المزامنة' 
+                        : 'تسجيل الدخول ومزامنة النظام'}
+                    </span>
+                  </button>
+                </form>
+
+                {/* Toggle Login/Register */}
+                <div className="text-center pt-2">
+                  <button
+                    onClick={() => {
+                      setIsRegisterMode(!isRegisterMode);
+                      setAuthError(null);
+                    }}
+                    className="text-xs text-indigo-650 hover:text-indigo-800 font-bold underline transition"
+                  >
+                    {isRegisterMode 
+                      ? 'لديك حساب بالفعل؟ سجل دخولك من هنا' 
+                      : 'ليس لديك حساب سحابي؟ سجل منشأتك مجاناً الآن'}
+                  </button>
+                </div>
+
+                {/* Or divider */}
+                <div className="relative my-3 flex py-1 items-center">
+                  <div className="flex-grow border-t border-slate-150"></div>
+                  <span className="flex-shrink mx-3 text-[10px] text-slate-400 font-bold uppercase font-mono">أو عن طريق جوجل</span>
+                  <div className="flex-grow border-t border-slate-150"></div>
+                </div>
+
+                {/* Google Google SSO Login */}
+                <button
+                  onClick={handleGoogleSignInInline}
+                  disabled={authWorking}
+                  type="button"
+                  className="w-full py-2.5 bg-white hover:bg-slate-50 text-slate-700 font-bold rounded-xl border border-slate-205 text-xs shadow-xs transition flex items-center justify-center gap-2 disabled:opacity-60 cursor-pointer"
+                >
+                  {authWorking ? (
+                    <Loader2 size={13} className="animate-spin text-slate-500" />
+                  ) : (
+                    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24">
+                      <path
+                        fill="#4285F4"
+                        d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v3.9h6.6a5.64 5.64 0 0 1-2.44 3.7l3.8 2.93c2.23-2.05 3.78-5.07 3.78-8.46Z"
+                      />
+                      <path
+                        fill="#34A853"
+                        d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.8-2.93c-1.05.7-2.4 1.13-4.13 1.13-3.18 0-5.86-2.15-6.82-5.05L1.31 17.3c2.01 4 6.13 6.7 10.69 6.7Z"
+                      />
+                      <path
+                        fill="#FBBC05"
+                        d="M5.18 14.19A7.16 7.16 0 0 1 4.8 12c0-.76.13-1.5.38-2.19L1.31 6.88A11.94 11.94 0 0 0 0 12c0 1.87.43 3.64 1.19 5.23l3.99-3.04Z"
+                      />
+                      <path
+                        fill="#EA4335"
+                        d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.43-3.43C17.95 1.19 15.24 0 12 0 7.44 0 3.32 2.7 1.31 6.88l3.87 3.03c.96-2.9 3.64-5.16 6.82-5.16Z"
+                      />
+                    </svg>
+                  )}
+                  <span>الدخول السريع بحساب Google</span>
+                </button>
+
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

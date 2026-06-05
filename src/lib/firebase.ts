@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth, GoogleAuthProvider, signInWithPopup, signOut } from 'firebase/auth';
+import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
 
@@ -18,6 +18,31 @@ export const loginWithGoogle = async () => {
     return result.user;
   } catch (error) {
     console.error('Google Auth Error:', error);
+    throw error;
+  }
+};
+
+// Email & Password login wrapper for mobile/APK compatibility
+export const loginWithEmail = async (email: string, pass: string) => {
+  try {
+    const result = await signInWithEmailAndPassword(auth, email, pass);
+    return result.user;
+  } catch (error) {
+    console.error('Email Sign-in Error:', error);
+    throw error;
+  }
+};
+
+// Email & Password register wrapper for mobile/APK compatibility
+export const registerWithEmail = async (email: string, pass: string, name: string) => {
+  try {
+    const result = await createUserWithEmailAndPassword(auth, email, pass);
+    if (result.user) {
+      await updateProfile(result.user, { displayName: name });
+    }
+    return result.user;
+  } catch (error) {
+    console.error('Email Registration Error:', error);
     throw error;
   }
 };

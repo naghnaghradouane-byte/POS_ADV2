@@ -9,6 +9,7 @@ import {
   ShoppingBag,
   Percent,
   CheckCircle2,
+  Check,
   Printer,
   X,
   CreditCard,
@@ -1379,32 +1380,30 @@ export default function POSView({
                     {/* Change to return */}
                     {receivedAmountNum >= total && (
                       <div className="p-3 bg-indigo-50 border border-indigo-100 rounded-xl text-center text-xs text-indigo-900 font-extrabold flex justify-between">
-                        <span>💰 الباقي المرجّع للزبون (Reste à rendre):</span>
-                        <span className="font-mono text-sm text-indigo-700">
-                          {returnChange.toFixed(2)} {currencySymbol}
-                        </span>
+                        <span>💰 الباقي للزبون (Reste à rendre):</span>
+                        <span>{(receivedAmountNum - total).toFixed(2)} {currencySymbol}</span>
                       </div>
                     )}
                   </div>
                 )}
-
               </div>
 
-              {/* Confirm Pay Button block */}
+              {/* Bottom footer buttons inside checkout modal */}
               <div className="pt-4 border-t border-slate-150 shrink-0 flex gap-3">
-                <button
-                  onClick={handleFinishCheckout}
-                  className="flex-1 py-3.5 bg-slate-900 hover:bg-slate-800 text-white rounded-2xl font-black text-xs flex items-center justify-center gap-2 transition active:scale-97 shadow-lg cursor-pointer"
-                >
-                  <CheckCircle2 size={16} className="text-emerald-400" />
-                  <span>تأكيد المبيعات وتنازل المخزون ✓</span>
-                </button>
                 <button
                   type="button"
                   onClick={() => setShowCheckout(false)}
-                  className="px-4 py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-2xl text-xs transition"
+                  className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold rounded-2xl text-xs transition cursor-pointer"
                 >
                   إلغاء النافذة
+                </button>
+                <button
+                  type="button"
+                  onClick={handleFinishCheckout}
+                  className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-2xl text-xs transition tracking-wide shadow-sm flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <Check size={16} />
+                  <span>تأكيد المبيعات وحفظ الفاتورة</span>
                 </button>
               </div>
 
@@ -1416,27 +1415,27 @@ export default function POSView({
       {/* --- Invoice Receipt Thermal Paper overlay --- */}
       <AnimatePresence>
         {showReceipt && lastCreatedOrder && (
-          <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-xs flex items-center justify-center p-2 rounded-3xl">
             <motion.div
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
-              className="bg-white rounded-3xl w-full max-w-sm overflow-hidden shadow-2xl border border-slate-100 text-slate-800 flex flex-col max-h-[90vh] text-right"
+              className="bg-white rounded-3xl w-full max-w-[305px] sm:max-w-sm overflow-hidden shadow-2xl border border-slate-100 text-slate-800 flex flex-col max-h-[92vh] text-right animate-fade-in"
             >
               
               {/* Header Title */}
-              <div className="p-4 bg-slate-900 text-white flex items-center justify-between shrink-0">
+              <div className="p-3 bg-slate-900 text-white flex items-center justify-between shrink-0">
                 <span className="font-bold text-xs">تم تسجيل وحفظ الفاتورة بنجاح ⚡</span>
                 <button
                   onClick={() => setShowReceipt(false)}
-                  className="text-slate-400 hover:text-white p-1 rounded-full bg-slate-800 text-xs px-2.5"
+                  className="text-slate-400 hover:text-white p-1 rounded-full bg-slate-800 text-xs px-2 w-6 h-6 flex items-center justify-center"
                 >
                   X
                 </button>
               </div>
 
               {/* Receipt Thermal container */}
-              <div className="flex-1 overflow-y-auto p-5 font-mono text-[10px] text-right bg-amber-50/10 space-y-4">
+              <div className="flex-1 overflow-y-auto p-3.5 sm:p-5 font-mono text-[9px] sm:text-[10px] text-right bg-amber-50/10 space-y-3 sm:space-y-4">
                 
                 {/* Store layout template */}
                 <div className="text-center space-y-1 pb-4 border-b border-dashed border-slate-300">
