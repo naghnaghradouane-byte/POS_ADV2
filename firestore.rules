@@ -113,7 +113,7 @@ service cloud.firestore {
         && o.amountPaid is number && o.amountPaid >= 0
         && o.change is number && o.change >= 0
         && o.date is string && o.date.size() <= 128
-        && o.status is string && (o.status == "completed" || o.status == "refunded" || o.status == "returned");
+        && o.status is string && (o.status == "completed" || o.status == "refunded" || o.status == "returned" || o.status == "partially_returned");
     }
 
     match /orders/{orderId} {
@@ -181,7 +181,7 @@ service cloud.firestore {
     }
 
     // 10. Settings validation
-    function isValidSettings(s) {
+    function isValidCompanySettings(s) {
       return s.keys().hasAll(['name', 'logo', 'phone', 'address', 'taxNumber', 'taxRate', 'currencySymbol', 'invoiceNotes'])
         && s.name is string && s.name.size() <= 256
         && s.logo is string && s.logo.size() <= 64
@@ -193,11 +193,52 @@ service cloud.firestore {
         && s.invoiceNotes is string && s.invoiceNotes.size() <= 1024;
     }
 
+    function isValidActiveSession(s) {
+      return s.keys().hasAll(['activeUserId'])
+        && s.activeUserId is string && s.activeUserId.size() <= 128;
+    }
+
     match /settings/{settingId} {
       allow read: if isSignedIn();
-      allow create: if isEmailVerified() && isValidId(settingId) && isValidSettings(incoming());
-      allow update: if isEmailVerified() && isValidId(settingId) && isValidSettings(incoming());
+      allow create, update: if isEmailVerified() && isValidId(settingId) && (
+        (settingId == "company" && isValidCompanySettings(incoming())) ||
+        (settingId == "active_session" && isValidActiveSession(incoming()))
+      );
       allow delete: if isEmailVerified() && isValidId(settingId);
+    }
+
+    // 11. Users list validation
+    function isValidUser(u) {
+      return u.keys().hasAll(['id', 'name', 'username', 'phone', 'pinCode', 'role', 'permissions'])
+        && u.id is string && u.id.size() <= 128
+        && u.name is string && u.name.size() <= 256
+        && u.username is string && u.username.size() <= 128
+        && u.phone is string && u.phone.size() <= 64
+        && u.pinCode is string && u.pinCode.size() <= 32
+        && u.role is string && (u.role == "admin" || u.role == "manager" || u.role == "cashier")
+        && u.permissions is map
+        && u.permissions.keys().hasAll(['dashboard', 'pos', 'products', 'categories', 'customers', 'suppliers', 'inventory', 'purchases', 'sales', 'expenses', 'reports', 'settings', 'editInvoices', 'returnItems'])
+        && u.permissions.dashboard is bool
+        && u.permissions.pos is bool
+        && u.permissions.products is bool
+        && u.permissions.categories is bool
+        && u.permissions.customers is bool
+        && u.permissions.suppliers is bool
+        && u.permissions.inventory is bool
+        && u.permissions.purchases is bool
+        && u.permissions.sales is bool
+        && u.permissions.expenses is bool
+        && u.permissions.reports is bool
+        && u.permissions.settings is bool
+        && u.permissions.editInvoices is bool
+        && u.permissions.returnItems is bool;
+    }
+
+    match /users_list/{userId} {
+      allow read: if isSignedIn();
+      allow create: if isEmailVerified() && isValidId(userId) && isValidUser(incoming()) && incoming().id == userId;
+      allow update: if isEmailVerified() && isValidId(userId) && isValidUser(incoming()) && incoming().id == userId;
+      allow delete: if isEmailVerified() && isValidId(userId);
     }
   }
 }

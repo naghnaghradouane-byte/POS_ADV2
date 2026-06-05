@@ -509,6 +509,7 @@ export default function App() {
             onUpdateCustomerBalance={handleUpdateCustomerBalance}
             currencySymbol={sym}
             defaultTaxRate={state.settings.taxRate}
+            settings={state.settings}
           />
         );
 
@@ -590,6 +591,7 @@ export default function App() {
             onUpdateCustomerBalance={handleUpdateCustomerBalance}
             currencySymbol={sym}
             activeUser={activeUser}
+            settings={state.settings}
           />
         );
 

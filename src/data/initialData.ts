@@ -332,13 +332,13 @@ export const initialERPState: ERPState = {
     { id: 'mov_4', productId: 'prod_2', productName: 'زيت دوار الشمس 1.5 لتر', type: 'adjust', quantity: 2, notes: 'تعديل مخزن - تالف من الشحن', date: '2026-06-02T11:00:00Z' },
   ],
   settings: {
-    name: 'سوبرماركت البرق التجاري',
-    logo: '⚡',
+    name: 'بي أو إس سيرفيس',
+    logo: '🖥️',
     phone: '0555555555',
-    address: 'المملكة العربية السعودية، الرياض، شارع التخصصي',
-    taxNumber: '310022334400003',
-    taxRate: 15.0, // 15% VAT
-    currencySymbol: 'ر.س',
+    address: 'OUARGLQ',
+    taxNumber: '',
+    taxRate: 0.0,
+    currencySymbol: 'د.ج',
     invoiceNotes: 'شكراً لتسوقكم معنا! البضاعة المباعة لا ترد ولا تستبدل إلا خلال 3 أيام مع الفاتورة الأصلية.',
   },
   users: [

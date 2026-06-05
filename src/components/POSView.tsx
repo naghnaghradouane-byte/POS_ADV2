@@ -1,5 +1,5 @@
 import React from 'react';
-import { Product, Category, Customer, Order, CartItem } from '../types';
+import { Product, Category, Customer, Order, CartItem, CompanySettings } from '../types';
 import {
   Search,
   Trash2,
@@ -35,6 +35,7 @@ interface POSViewProps {
   onUpdateCustomerBalance: (customerId: string, balanceChange: number) => void;
   currencySymbol: string;
   defaultTaxRate: number;
+  settings: CompanySettings;
 }
 
 // Crisp, lightweight audio feedback generator via Web Audio API
@@ -106,6 +107,7 @@ export default function POSView({
   onUpdateCustomerBalance,
   currencySymbol,
   defaultTaxRate,
+  settings,
 }: POSViewProps) {
   // Navigation & Filtering
   const [selectedCategory, setSelectedCategory] = React.useState<string>('all');
@@ -1439,10 +1441,14 @@ export default function POSView({
                 
                 {/* Store layout template */}
                 <div className="text-center space-y-1 pb-4 border-b border-dashed border-slate-300">
-                  <p className="text-sm font-black tracking-tight text-slate-900">⚡ سوبرماركت البرق التجاري ⚡</p>
-                  <p className="text-[9px] text-slate-500">الرياض - شارع التخصصي العام</p>
-                  <p className="text-[9px] text-slate-500">الهاتف: 0555555555</p>
-                  <p className="text-[9px] text-slate-500 font-extrabold">الرقم الضريبي VAT: 310022334400003</p>
+                  <p className="text-sm font-black tracking-tight text-slate-900">{settings.logo} {settings.name} {settings.logo}</p>
+                  <p className="text-[9px] text-slate-500">{settings.address}</p>
+                  {settings.phone && (
+                    <p className="text-[9px] text-slate-500">الهاتف: {settings.phone}</p>
+                  )}
+                  {settings.taxNumber && (
+                    <p className="text-[9px] text-slate-500 font-extrabold">الرقم الضريبي VAT: {settings.taxNumber}</p>
+                  )}
                 </div>
 
                 {/* Invoice Metadata */}
@@ -1487,7 +1493,7 @@ export default function POSView({
                     </div>
                   )}
                   <div className="flex justify-between">
-                    <span>ضريبة القيمة المضافة 15%:</span>
+                    <span>ضريبة القيمة المضافة {settings.taxRate}%:</span>
                     <span className="font-bold">{lastCreatedOrder.taxAmount.toFixed(2)} {currencySymbol}</span>
                   </div>
                   <div className="flex justify-between text-sm font-black text-slate-950 border-t border-slate-300 pt-2">

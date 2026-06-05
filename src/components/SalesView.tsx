@@ -1,5 +1,5 @@
 import React from 'react';
-import { Order, Product, SystemUser } from '../types';
+import { Order, Product, SystemUser, CompanySettings } from '../types';
 import { Search, Receipt, ArrowLeftRight, Check, Printer, X, ShoppingBag, Edit3, Save, Info, Lock, Download, FileSpreadsheet } from 'lucide-react';
 
 interface SalesViewProps {
@@ -11,6 +11,7 @@ interface SalesViewProps {
   onUpdateCustomerBalance: (customerId: string, balanceChange: number) => void;
   currencySymbol: string;
   activeUser?: SystemUser;
+  settings: CompanySettings;
 }
 
 export default function SalesView({
@@ -22,6 +23,7 @@ export default function SalesView({
   onUpdateCustomerBalance,
   currencySymbol,
   activeUser,
+  settings,
 }: SalesViewProps) {
   const [searchQuery, setSearchQuery] = React.useState('');
 
@@ -162,7 +164,7 @@ export default function SalesView({
     
     const subtotal = editingOrder.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
     const discount = editingOrder.items.reduce((sum, item) => sum + (item.price * (item.discount / 100) * item.quantity), 0);
-    const tax = (subtotal - discount) * 0.15; // 15% VAT
+    const tax = (subtotal - discount) * (settings.taxRate / 100); // Dynamic VAT
     const total = (subtotal - discount) + tax;
 
     return { subtotal, discount, tax, total };
@@ -565,10 +567,14 @@ export default function SalesView({
             {/* Simulated Printed Thermal Paper layout */}
             <div className="flex-1 overflow-y-auto p-4 sm:p-6 font-mono text-[10px] sm:text-[11px] text-right bg-amber-50/10 space-y-3 sm:space-y-4">
               <div className="text-center space-y-1 pb-4 border-b border-dashed border-slate-300">
-                <p className="text-base font-black tracking-tight text-slate-900">سوبرماركت البرق التجاري</p>
-                <p className="text-slate-500 text-[10px]">الرياض - شارع التخصصي</p>
-                <p className="text-slate-500 text-[10px]">الهاتف: 0555555555</p>
-                <p className="text-slate-500 font-bold text-[10px]">الرقم الضريبي VAT: 310022334400003</p>
+                <p className="text-base font-black tracking-tight text-slate-900">{settings.logo} {settings.name} {settings.logo}</p>
+                <p className="text-slate-500 text-[10px]">{settings.address}</p>
+                {settings.phone && (
+                  <p className="text-slate-500 text-[10px]">الهاتف: {settings.phone}</p>
+                )}
+                {settings.taxNumber && (
+                  <p className="text-slate-500 font-bold text-[10px]">الرقم الضريبي VAT: {settings.taxNumber}</p>
+                )}
               </div>
 
               <div className="space-y-1 text-slate-600 border-b border-dashed border-slate-250 pb-3">
@@ -578,8 +584,8 @@ export default function SalesView({
                 <p>
                   الحالة الضريبية: {
                     viewedOrder.status === 'refunded' ? 'مرتجع بالكامل' :
-                    viewedOrder.status === 'partially_returned' ? 'مرتجع جزئي ملخص بضريبة 15%' :
-                    'مبيعات مكتملة بضريبة 15%'
+                    viewedOrder.status === 'partially_returned' ? `مرتجع جزئي ملخص بضريبة ${settings.taxRate}%` :
+                    `مبيعات مكتملة بضريبة ${settings.taxRate}%`
                   }
                 </p>
               </div>
@@ -620,7 +626,7 @@ export default function SalesView({
                   </div>
                 )}
                 <div className="flex justify-between">
-                  <span>ضريبة القيمة المضافة 15%:</span>
+                  <span>ضريبة القيمة المضافة {settings.taxRate}%:</span>
                   <span className="font-bold">{viewedOrder.taxAmount.toFixed(2)} {currencySymbol}</span>
                 </div>
                 <div className="flex justify-between text-base font-black text-slate-950 border-t border-slate-305 pt-1.5">

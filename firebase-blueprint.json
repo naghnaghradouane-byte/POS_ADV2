@@ -172,6 +172,56 @@
         "invoiceNotes": { "type": "string" }
       },
       "required": ["name", "logo", "phone", "address", "taxNumber", "taxRate", "currencySymbol", "invoiceNotes"]
+    },
+    "UserPermissions": {
+      "title": "UserPermissions",
+      "description": "Permissions associated with a system user role",
+      "type": "object",
+      "properties": {
+        "dashboard": { "type": "boolean" },
+        "pos": { "type": "boolean" },
+        "products": { "type": "boolean" },
+        "categories": { "type": "boolean" },
+        "customers": { "type": "boolean" },
+        "suppliers": { "type": "boolean" },
+        "inventory": { "type": "boolean" },
+        "purchases": { "type": "boolean" },
+        "sales": { "type": "boolean" },
+        "expenses": { "type": "boolean" },
+        "reports": { "type": "boolean" },
+        "settings": { "type": "boolean" },
+        "editInvoices": { "type": "boolean" },
+        "returnItems": { "type": "boolean" }
+      },
+      "required": [
+        "dashboard", "pos", "products", "categories", "customers", "suppliers", 
+        "inventory", "purchases", "sales", "expenses", "reports", "settings", 
+        "editInvoices", "returnItems"
+      ]
+    },
+    "SystemUser": {
+      "title": "SystemUser",
+      "description": "System user account / credential details",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "username": { "type": "string" },
+        "phone": { "type": "string" },
+        "pinCode": { "type": "string" },
+        "role": { "type": "string", "enum": ["admin", "manager", "cashier"] },
+        "permissions": { "$ref": "#/entities/UserPermissions" }
+      },
+      "required": ["id", "name", "username", "phone", "pinCode", "role", "permissions"]
+    },
+    "ActiveSession": {
+      "title": "ActiveSession",
+      "description": "Currently active user session ID pointer",
+      "type": "object",
+      "properties": {
+        "activeUserId": { "type": "string" }
+      },
+      "required": ["activeUserId"]
     }
   },
   "firestore": {
@@ -210,6 +260,10 @@
     "/settings/{settingId}": {
       "schema": { "$ref": "#/entities/CompanySettings" },
       "description": "Static enterprise configurations including VAT information"
+    },
+    "/users_list/{userId}": {
+      "schema": { "$ref": "#/entities/SystemUser" },
+      "description": "Internal login accounts for point-of-sale registers"
     }
   }
 }
